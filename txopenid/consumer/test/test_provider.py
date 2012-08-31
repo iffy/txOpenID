@@ -9,13 +9,13 @@ Provider storage tests
 
 
 from twisted.trial.unittest import TestCase
-from twisted.internet import defer
+from twisted.internet import defer, task
 
 from datetime import datetime
 
 
 from txopenid.consumer.provider import (Provider, InMemoryProviderStore,
-                                        Association)
+                                        Association, InMemoryAssociationStore)
 
 
 
@@ -29,6 +29,11 @@ class ProviderTest(TestCase):
         p = Provider('example.com')
         self.assertEqual(p.discovery_url, 'example.com')
         self.assertEqual(p.endpoint, None)
+        self.assertTrue(isinstance(p.associations,
+                                   Provider.associationStoreFactory),
+                        "Should have an association store created from the "
+                        "associationStoreFactory")
+
 
 
 
@@ -128,10 +133,6 @@ class AssociationTest(TestCase):
         This should have all the attributes expected by the OpenID spec.
         """
         a = Association()
-        self.assertEqual(a.expires_in, Association.expires_in)
-        self.assertEqual(type(a.expires_in), int)
-        self.assertNotEqual(a.created, None)
-        self.assertTrue(a.created <= datetime.now())
         self.assertEqual(a.assoc_handle, None)
         self.assertEqual(a.mac_key, None)
         #XXX I know there are others.
@@ -142,17 +143,83 @@ class AssociationTest(TestCase):
         You can override all of the defaults on init
         """
         kwargs = {
-            'expires_in': 245,
-            'created': datetime(2000, 1, 1, 12, 45, 34),
             'assoc_handle': 'foobar',
             'mac_key': 'some key',
         }
         a = Association(**kwargs)
-        self.assertEqual(a.expires_in, 245)
-        self.assertEqual(a.created, datetime(2000, 1, 1, 12, 45, 34))
         self.assertEqual(a.assoc_handle, 'foobar')
         self.assertEqual(a.mac_key, 'some key')
 
+
+
+class AssociationStoreTestMixin:
+
+    timeout = 1
+    
+
+    def getIAssociationStore(self):
+        raise NotImplementedError("Must implement getIAssociationStore")
+
+
+    def fakePassageOfTime(self, seconds):
+        """
+        Make the store returned by L{getIAssociationStore} think that a number
+        of seconds has elapsed.
+        """
+        raise NotImplementedError("You must implement fakePassageOfTime")
+
+
+    @defer.inlineCallbacks
+    def test_add(self):
+        """
+        You can add associations
+        """
+        store = self.getIAssociationStore()
+        
+        a = Association(assoc_handle='foo')
+        b = yield store.add(a)
+        self.assertEqual(b, 'foo', "Should return the assoc_handle")
+
+
+    @defer.inlineCallbacks
+    def test_get(self):
+        """
+        You can get associations by the handle
+        """
+        store = self.getIAssociationStore()
+        
+        a = Association(assoc_handle='foo')
+        b = yield store.add(a)
+        c = yield store.get(b)
+        self.assertEqual(c, a, "Should return an equivalent Association")
+
+
+    @defer.inlineCallbacks
+    def test_get_expired(self):
+        """
+        You can't get expired associations out.
+        """
+        store = self.getIAssociationStore()
+        
+        a = Association(assoc_handle='foo')
+        b = yield store.add(a, expires_in=100)
+        self.fakePassageOfTime(101)
+        self.assertFailure(defer.maybeDeferred(store.get, b), KeyError,
+                           "When an association expires, it should be gone")
+
+
+
+
+class InMemoryAssociationStoreTest(TestCase, AssociationStoreTestMixin):
+
+    
+    def getIAssociationStore(self):
+        self._reactor = task.Clock()
+        return InMemoryAssociationStore(reactor=self._reactor)
+
+
+    def fakePassageOfTime(self, seconds):
+        self._reactor.advance(seconds)
 
 
 
