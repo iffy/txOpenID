@@ -7,6 +7,8 @@
 Provider information and access
 """
 
+from datetime import datetime
+
 
 
 class Provider(object):
@@ -70,6 +72,27 @@ class InMemoryProviderStore(object):
 
     def values(self):
         return self.providers.values()
+
+
+
+class Association(object):
+    """
+    I am an association between an OpenID provider and consumer as seen by the
+    consumer.
+    """
+    
+    expires_in = 46800
+    created = None
+    assoc_handle = None
+    mac_key = None
+    
+    
+    def __init__(self, assoc_handle=None, mac_key=None, expires_in=None,
+                 created=None):
+        self.expires_in = expires_in or self.expires_in
+        self.created = created or datetime.now()
+        self.assoc_handle = assoc_handle
+        self.mac_key = mac_key
 
 
 

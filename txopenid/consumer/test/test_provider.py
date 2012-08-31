@@ -11,9 +11,11 @@ Provider storage tests
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 
+from datetime import datetime
 
 
-from txopenid.consumer.provider import Provider, InMemoryProviderStore
+from txopenid.consumer.provider import (Provider, InMemoryProviderStore,
+                                        Association)
 
 
 
@@ -114,6 +116,43 @@ class InMemoryProviderStoreTest(TestCase, ProviderStoreTestMixin):
 
     def getInstance(self):
         return InMemoryProviderStore()
+
+
+
+
+class AssociationTest(TestCase):
+
+
+    def test_attributes(self):
+        """
+        This should have all the attributes expected by the OpenID spec.
+        """
+        a = Association()
+        self.assertEqual(a.expires_in, Association.expires_in)
+        self.assertEqual(type(a.expires_in), int)
+        self.assertNotEqual(a.created, None)
+        self.assertTrue(a.created <= datetime.now())
+        self.assertEqual(a.assoc_handle, None)
+        self.assertEqual(a.mac_key, None)
+        #XXX I know there are others.
+
+
+    def test_init(self):
+        """
+        You can override all of the defaults on init
+        """
+        kwargs = {
+            'expires_in': 245,
+            'created': datetime(2000, 1, 1, 12, 45, 34),
+            'assoc_handle': 'foobar',
+            'mac_key': 'some key',
+        }
+        a = Association(**kwargs)
+        self.assertEqual(a.expires_in, 245)
+        self.assertEqual(a.created, datetime(2000, 1, 1, 12, 45, 34))
+        self.assertEqual(a.assoc_handle, 'foobar')
+        self.assertEqual(a.mac_key, 'some key')
+
 
 
 
