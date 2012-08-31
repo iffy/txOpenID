@@ -16,35 +16,6 @@ from txopenid.consumer.liason import Liason
 
 
 
-class FakeHTTPResponse:
-
-
-    def __init__(self, text, headers=None, code=200):
-        self.text = text
-        self.headers = headers or {}
-        self.code = code
-
-
-
-class FakeHTTPAgent:
-
-
-    def __init__(self, responses=None):
-        self.responses = responses or []
-        self.called = []
-
-
-    def get(self, *args, **kwargs):
-        self.called.append(('get', args, kwargs))
-        return self.responses.pop(0)
-
-
-    def post(self, *args, **kwargs):
-        self.called.append(('post', args, kwargs))
-        return self.responses.pop(0)
-
-
-
 class LiasonTest(TestCase):
 
 

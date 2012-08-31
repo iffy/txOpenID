@@ -7,9 +7,12 @@
 Provider information and access
 """
 
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 
 from datetime import datetime
+
+
+import re
 
 
 
@@ -85,15 +88,33 @@ class Provider(object):
     @ivar endpoint: Endpoint URL
     
     @ivar associations: A place to store and retrieve L{Association}s.
+    
+    @ivar agent: HTTP agent for doing requests against the provider I represent.
     """
     
     associationStoreFactory = InMemoryAssociationStore
 
     
-    def __init__(self, discovery_url):
+    def __init__(self, discovery_url, agent=None):
         self.discovery_url = discovery_url
         self.endpoint = None
         self.associations = self.associationStoreFactory()
+        self.agent = agent
+
+
+    def discover(self):
+        """
+        XXX
+        """
+        if self.endpoint:
+            return defer.succeed(self.endpoint)
+
+        def discovered(response, self):
+            r_uri = re.compile('<URI>(.*?)</URI>')
+            m = r_uri.search(response.text)
+            self.endpoint = m.groups()[0]
+            return self.endpoint
+        return self.agent.get(self.discovery_url).addCallback(discovered, self)
 
 
 

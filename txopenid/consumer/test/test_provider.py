@@ -18,6 +18,34 @@ from txopenid.consumer.provider import (Provider, InMemoryProviderStore,
                                         Association, InMemoryAssociationStore)
 
 
+class FakeHTTPResponse:
+
+
+    def __init__(self, text, headers=None, code=200):
+        self.text = text
+        self.headers = headers or {}
+        self.code = code
+
+
+
+class FakeHTTPAgent:
+
+
+    def __init__(self, responses=None):
+        self.responses = responses or []
+        self.called = []
+
+
+    def get(self, *args, **kwargs):
+        self.called.append(('get', args, kwargs))
+        return defer.succeed(self.responses.pop(0))
+
+
+    def post(self, *args, **kwargs):
+        self.called.append(('post', args, kwargs))
+        return defer.succeed(self.responses.pop(0))
+
+
 
 class ProviderTest(TestCase):
 
@@ -26,14 +54,41 @@ class ProviderTest(TestCase):
         """
         L{Provider} should have attributes known to a consumer
         """
-        p = Provider('example.com')
+        p = Provider('example.com', agent='foo')
         self.assertEqual(p.discovery_url, 'example.com')
         self.assertEqual(p.endpoint, None)
         self.assertTrue(isinstance(p.associations,
                                    Provider.associationStoreFactory),
                         "Should have an association store created from the "
                         "associationStoreFactory")
+        self.assertEqual(p.agent, 'foo')
 
+
+    @defer.inlineCallbacks
+    def test_discover(self):
+        """
+        Doing discovery will use the agent by default, then cache the url for
+        later discovery attempts.
+        """
+        agent = FakeHTTPAgent([
+            FakeHTTPResponse('stuff<URI>foobar</URI>morestuff'),
+        ])
+        
+        p = Provider('example.com', agent=agent)
+        url = yield p.discover()
+        self.assertEqual(url, 'foobar')
+        self.assertEqual(p.endpoint, 'foobar', "Set the endpoint")
+        self.assertEqual(agent.called, [
+            ('get', ('example.com',), {})
+        ])
+        
+        # reset agent mock
+        agent.called.pop()
+        
+        url2 = yield p.discover()
+        self.assertEqual(url2, 'foobar')
+        self.assertEqual(len(agent.called), 0, "Should not have used the http "
+                         "agent because the value is cached")
 
 
 
